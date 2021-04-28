@@ -1,0 +1,10 @@
+
+body {
+    background-color: #ffdab9;
+    text-align: center;
+}
+
+.fullScreenFrame > div {
+    display: flex;
+    justify-content: center;
+}
