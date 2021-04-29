@@ -23,13 +23,16 @@ from sklearn.metrics.pairwise import cosine_similarity
 import time
 import streamlit as st
 from random import sample
+#   Doc2Vec module
+from gensim.test.utils import common_texts
+from gensim.models.doc2vec import Doc2Vec, TaggedDocument
+from gensim.test.utils import get_tmpfile
 
 #   Global config
 st.set_page_config(page_title='CookingNaNa',page_icon='NaNaLogo.png',layout='centered',initial_sidebar_state='expanded')
-
 st.title(" Cooking NaNa Recipe Recommendation ")
 
-with open("style.css") as f:
+with open("style.css") as f:    #   load CSS style file
     st.markdown('<style>{}</style>'.format(f.read()), unsafe_allow_html=True)
 
 
@@ -60,41 +63,61 @@ def lemma(text):
     lem_text = [lem.lemmatize(word) for word in text.split()]
     return lem_text
 
+#   Others
 def update_matching_list(search_word):
     name_lst = lemma(stopwords(token(search_word)))
     st.write('search_lst:    ', name_lst)
     df_raw_recipe['matching'] = df_raw_recipe['recipe_name_clean'].apply(lambda x: sum(
-     [1 if lem.lemmatize(a) in name_lst else 0 for a in x.split(" ")])) 
+     [1 if lem.lemmatize(a) in name_lst else 0 for a in x.split(" ")]))     #   Score for calculting distance between recipes
 
 def to_join_ingredients(x):
     if type(x)==list:
-        return ', '.join(x)
+        return ', '.join(x) #For formatting ingredient column of the input file (cleaned data is saved as string)
     return x
+
+def parseF(x):
+    x = x.strip("[")
+    x = x.strip("]")
+    wordList = x.split(",")
+    return wordList         #For Doc2Vect:  to do formatting on input file 
 
 
 #   ---------------------------------Load CSV---------------------------------
 @st.cache(persist=True,allow_output_mutation=True)
-
 def get_recipe_data():
     url_recipe = "data_recipe_deploy.csv"    #data_recipe_clean  data_recipe_deploy
     df = pd.read_csv(url_recipe,index_col='recipe_id')
     df['ingredients'] = df['ingredients'].str.split('^')
     df['ingredients'] = df['ingredients'].apply(lambda x: to_join_ingredients(x))
     return df
-df_raw_recipe = get_recipe_data()
+df_raw_recipe = get_recipe_data()   #Get general data
 
 @st.cache(persist=True,allow_output_mutation=True)
-
 def get_rating_data():
     url_rating = "data_rating_clean.csv"
     return pd.read_csv(url_rating)
-df_raw_rating = get_rating_data()
-    
-@st.cache(persist=True,allow_output_mutation=True)
+df_raw_rating = get_rating_data()   #Get rating data
 
+@st.cache(persist=True,allow_output_mutation=True)
 def recommender_hot_recipe_data():
     url = "hot_recipe_by_rating.csv"
-    return pd.read_csv(url)
+    return pd.read_csv(url)         #Get hot trending recipe
+
+@st.cache(persist=True,allow_output_mutation=True)
+def get_data_df_all():
+    url_all = "df_all_deploy2.csv"
+    df_all=pd.read_csv(url_all, index_col="recipe_id")
+    df_all["ingredients"] = df_all["ingredients"].apply(parseF)
+    df_all["cooking_directions"] = df_all["cooking_directions"].apply(parseF)
+    df_all["Vect_recipe_name"] = df_all["Vect_recipe_name"].apply(parseF)
+    df_all["recipe_tag"] = df_all["recipe_tag"].apply(parseF)
+    return df_all
+df_all = get_data_df_all()
+
+@st.cache(persist=True,allow_output_mutation=True)
+def get_Doc2Vec_model():
+    return Doc2Vec.load("doc2vec_model_final")
+model_directions = get_Doc2Vec_model()
 
 #   ---------------------------------  Function ---------------------------------
 def recommender_hot_recipe(n=3):
@@ -201,32 +224,7 @@ def recommender_collabarative_by_recipeID(recipeID , N = 3):
         recipeRecommended.remove(recipeID)
     return recipeRecommended[:N]
 
-#  --------------------------------- DOC2VEC FUNCTION ---------------------------------
-
-from gensim.test.utils import common_texts
-from gensim.models.doc2vec import Doc2Vec, TaggedDocument
-from gensim.test.utils import get_tmpfile
-
-def parseF(x):
-    x = x.strip("[")
-    x = x.strip("]")
-    wordList = x.split(",")
-    return wordList
-
-@st.cache(persist=True,allow_output_mutation=True)
-def get_data_df_all():
-    url_all = "df_all_deploy2.csv"
-    df_all=pd.read_csv(url_all, index_col="recipe_id")
-    df_all["ingredients"] = df_all["ingredients"].apply(parseF)
-    df_all["cooking_directions"] = df_all["cooking_directions"].apply(parseF)
-    df_all["Vect_recipe_name"] = df_all["Vect_recipe_name"].apply(parseF)
-    df_all["recipe_tag"] = df_all["recipe_tag"].apply(parseF)
-    return df_all
-
-df_all = get_data_df_all()
-
-model_directions = Doc2Vec.load("doc2vec_model_final")
-
+#  --------------------------------- DOC2VEC Section ---------------------------------
 def docToVecAlgo(dataframe, recipe_id, n):
     test_doc = dataframe.loc[recipe_id]["cooking_directions"]
     originalData = dataframe[dataframe.index == recipe_id]
@@ -399,7 +397,9 @@ for x in range(0,len(recipe_list)):
 def to_improve():
     '''
     Undone:
-    DOC2VEC
+    DOC2VEC (Merge David's file to the master file)
+    ReadMe      
+    Upload .ipynb to show data cleaning 
 
     Add:
     Hybrid ( library should be spice?)
